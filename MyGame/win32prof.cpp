@@ -1,5 +1,5 @@
 #include <windows.h>
-
+#include <iostream>
 /*
 
 wnd - window
@@ -9,13 +9,13 @@ h - handler
 UINT - unsigned integer
 param - parameter
 l - long
-rect - rectangle >> прямоугольник
-alloc - allocate - размечать память
+rect - rectangle >> РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРє
+alloc - allocate - СЂР°Р·РјРµС‡Р°С‚СЊ РїР°РјСЏС‚СЊ
 
-default - по умолчанию
-use - использовать
-destroy - разрушить
-close - закрыть
+default - РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
+use - РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ
+destroy - СЂР°Р·СЂСѓС€РёС‚СЊ
+close - Р·Р°РєСЂС‹С‚СЊ
 
 	 top
 left      right
@@ -24,10 +24,13 @@ left      right
 
 bool running = true;
 
-void* bufferMemory;
-int bufferWidth;
-int bufferHeight;
-BITMAPINFO bufferBitmapInfo;
+struct RenderState {
+	void* memory;
+	int width;
+	int height;
+	BITMAPINFO bitmapInfo;
+};
+RenderState renderState;
 
 LRESULT CALLBACK windowClick(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	LRESULT result = 0;
@@ -40,20 +43,20 @@ LRESULT CALLBACK windowClick(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_SIZE: {
 		RECT rect;
-		GetClientRect(hWnd, &rect);
+		GetClientRect(hWnd, &rect); // С„СѓРЅРєС†РёСЏ СЂР°Р·РјРµСЂР° РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°
 
-		bufferWidth = rect.right - rect.left;
-		bufferHeight = rect.bottom - rect.top;
+		renderState.width = rect.right - rect.left; // С€РёСЂРёРЅР° РѕРєРЅР°
+		renderState.height = rect.bottom - rect.top; // РІС‹СЃРѕС‚Р° РѕРєРЅР°
 
-		int bufferSize = bufferWidth * bufferHeight * sizeof(unsigned int);
+		int bufferSize = renderState.width * renderState.height * sizeof(unsigned int); // РІС‹СЃС‡РёС‚С‹РІР°РµРј СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°
 
-		if (bufferMemory)
-			VirtualFree(bufferMemory, 0, MEM_RELEASE);
-		bufferMemory = VirtualAlloc(0, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+		if (renderState.memory) // РІС‹СЏСЃРЅРµРј РµСЃС‚СЊ РїР°РјСЏС‚СЊ 
+			VirtualFree(renderState.memory, 0, MEM_RELEASE); // РѕСЃРІРѕР¶РґР°РµРј РїР°РјСЏС‚СЊ
+		renderState.memory = VirtualAlloc(0, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE); // Р·Р°РїРёСЃС‹РІР°РµРј РЅРѕРІСѓСЋ РїР°РјСЏС‚СЊ
 
 		bufferBitmapInfo.bmiHeader.biSize = sizeof(bufferBitmapInfo.bmiHeader);
-		bufferBitmapInfo.bmiHeader.biWidth = bufferWidth;
-		bufferBitmapInfo.bmiHeader.biHeight = bufferHeight;
+		bufferBitmapInfo.bmiHeader.biWidth = renderState.width;
+		bufferBitmapInfo.bmiHeader.biHeight = renderState.height;
 		bufferBitmapInfo.bmiHeader.biPlanes = 1;
 		bufferBitmapInfo.bmiHeader.biBitCount = 32;
 		bufferBitmapInfo.bmiHeader.biCompression = BI_RGB;
@@ -68,31 +71,49 @@ LRESULT CALLBACK windowClick(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 };
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
-	// создать класс window
+	// СЃРѕР·РґР°С‚СЊ РєР»Р°СЃСЃ window
 	WNDCLASS WindowClass = {};
 	WindowClass.style = CS_HREDRAW | CS_VREDRAW;
 	WindowClass.lpszClassName = TEXT("Game Window Class");
 	WindowClass.lpfnWndProc = windowClick;
 
-	// зарегистрировать этот класс
+	// Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ СЌС‚РѕС‚ РєР»Р°СЃСЃ
 	RegisterClass(&WindowClass);
 
-	// создать окно
+	// СЃРѕР·РґР°С‚СЊ РѕРєРЅРѕ РїРѕ С€Р°Р±Р»РѕРЅСѓ
 	HWND window = CreateWindow(WindowClass.lpszClassName, TEXT("Pong - Tutorial"), WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, 0, 0, hInstance, 0);
 	HDC hdc = GetDC(window);
 
 	while (running)
 	{
-		// ввод
+		// РІРІРѕРґ
 		MSG message;
 		while (PeekMessage(&message, window, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&message);
 			DispatchMessage(&message);
 		}
-		// симуляция - процесс игры
+		// СЃРёРјСѓР»СЏС†РёСЏ - РїСЂРѕС†РµСЃСЃ РёРіСЂС‹
+		unsigned int* pixel = (unsigned int*) renderState.memory;
+		for (size_t y = 0; y < renderState.height; y++) {
+			for (size_t x = 0; x < renderState.width; x++) {
+				*pixel++ = 0x1c3578;
+			}
+		}
+		/*for (size_t y = 0; y < renderState.height; y++)
+		{
+			for (size_t x = 0; x < renderState.width; x++)
+			{
+				if (y * 3 < renderState.height)
+					*pixel++ = 0xe4181c;
+				else if (y * 3 < 2 * renderState.height)
+					*pixel++ = 0x1c3578;
+				else
+					*pixel++ = 0xffffff;
+			}
+		}*/
 
-		// перерисовка
-		StretchDIBits(hdc, 0, 0, bufferWidth, bufferHeight, 0, 0, bufferWidth, bufferHeight, bufferMemory, &bufferBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+		// РїРµСЂРµСЂРёСЃРѕРІРєР°
+		StretchDIBits(hdc, 0, 0, renderState.width, renderState.height, 0, 0, renderState.width, renderState.height, renderState.memory, &bufferBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 	}
 };
