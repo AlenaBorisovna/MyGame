@@ -1,3 +1,4 @@
+#include "utils.cpp"
 #include <windows.h>
 #include <iostream>
 /*
@@ -22,7 +23,7 @@ left      right
 	bottom
 */
 
-bool running = true;
+globalVariable bool running = true;
 
 struct RenderState {
 	void* memory;
@@ -30,7 +31,9 @@ struct RenderState {
 	int height;
 	BITMAPINFO bitmapInfo;
 };
-RenderState renderState;
+globalVariable RenderState renderState;
+#include "platforme_com.cpp"
+#include "rendere.cpp"
 
 LRESULT CALLBACK windowClick(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	LRESULT result = 0;
@@ -54,12 +57,12 @@ LRESULT CALLBACK windowClick(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			VirtualFree(renderState.memory, 0, MEM_RELEASE); // освождаем память
 		renderState.memory = VirtualAlloc(0, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE); // записываем новую память
 
-		bufferBitmapInfo.bmiHeader.biSize = sizeof(bufferBitmapInfo.bmiHeader);
-		bufferBitmapInfo.bmiHeader.biWidth = renderState.width;
-		bufferBitmapInfo.bmiHeader.biHeight = renderState.height;
-		bufferBitmapInfo.bmiHeader.biPlanes = 1;
-		bufferBitmapInfo.bmiHeader.biBitCount = 32;
-		bufferBitmapInfo.bmiHeader.biCompression = BI_RGB;
+		renderState.bitmapInfo.bmiHeader.biSize = sizeof(renderState.bitmapInfo.bmiHeader);
+		renderState.bitmapInfo.bmiHeader.biWidth = renderState.width;
+		renderState.bitmapInfo.bmiHeader.biHeight = renderState.height;
+		renderState.bitmapInfo.bmiHeader.biPlanes = 1;
+		renderState.bitmapInfo.bmiHeader.biBitCount = 32;
+		renderState.bitmapInfo.bmiHeader.biCompression = BI_RGB;
 
 	} break;
 
@@ -84,36 +87,54 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	HWND window = CreateWindow(WindowClass.lpszClassName, TEXT("Pong - Tutorial"), WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, 0, 0, hInstance, 0);
 	HDC hdc = GetDC(window);
 
+	Input input = {};
+
 	while (running)
 	{
 		// ввод
 		MSG message;
+
+		for (size_t i = 0; i < BUTTON_COUNT; i++)
+		{
+			input.buttons[i].changed = false;
+		}
+
 		while (PeekMessage(&message, window, 0, 0, PM_REMOVE))
 		{
-			TranslateMessage(&message);
-			DispatchMessage(&message);
+			switch (message.message) {
+			case WM_KEYUP:
+			case WM_KEYDOWN: {
+				u32 vkCode = (u32)message.wParam;
+				bool isDown = ((message.lParam & (1 << 31)) == 0);
+
+				switch (vkCode) {
+				case VK_UP: {
+					input.buttons[BUTTON_UP].isDown = true;
+					input.buttons[BUTTON_UP].changed = true;
+				} break;
+				}
+
+			} break;
+			default: {
+				TranslateMessage(&message);
+				DispatchMessage(&message);
+			}
+			}
 		}
 		// симуляция - процесс игры
-		unsigned int* pixel = (unsigned int*) renderState.memory;
-		for (size_t y = 0; y < renderState.height; y++) {
-			for (size_t x = 0; x < renderState.width; x++) {
-				*pixel++ = 0x1c3578;
-			}
-		}
-		/*for (size_t y = 0; y < renderState.height; y++)
-		{
-			for (size_t x = 0; x < renderState.width; x++)
-			{
-				if (y * 3 < renderState.height)
-					*pixel++ = 0xe4181c;
-				else if (y * 3 < 2 * renderState.height)
-					*pixel++ = 0x1c3578;
-				else
-					*pixel++ = 0xffffff;
-			}
-		}*/
+		clearScreen(0xff5500);
+		if (input.buttons[BUTTON_UP].isDown)
+			drawRectangle(0, 0, 1, 1, 0x00ff22);
+		drawRectangle(30, 30, 5, 5, 0xffff22);
+		drawRectangle(-20, 20, 8, 3, 0xffff22);
+		// симуляция - процесс игры
+		//renderBackground();
+		clearScreen(0xff5500);
+		drawRectangle(0, 0, 10, 10, 0x00ff22);
+		drawRectangle(30, 30, 5, 5, 0xffff22);
+		drawRectangle(-25, 20, 8, 3, 0x00ff22);
 
 		// перерисовка
-		StretchDIBits(hdc, 0, 0, renderState.width, renderState.height, 0, 0, renderState.width, renderState.height, renderState.memory, &bufferBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+		StretchDIBits(hdc, 0, 0, renderState.width, renderState.height, 0, 0, renderState.width, renderState.height, renderState.memory, &renderState.bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 	}
 };
