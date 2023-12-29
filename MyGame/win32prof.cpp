@@ -1,6 +1,7 @@
 #include "utils.cpp"
 #include <windows.h>
 #include <iostream>
+
 /*
 
 wnd - window
@@ -13,10 +14,17 @@ l - long
 rect - rectangle >> прямоугольник
 alloc - allocate - размечать память
 
+когда рисуем
+h - horizontal
+v - vertical
+
 default - по умолчанию
 use - использовать
 destroy - разрушить
 close - закрыть
+
+src - source - откуда
+dst - destination - куда
 
 	 top
 left      right
@@ -27,13 +35,14 @@ globalVariable bool running = true;
 
 struct RenderState {
 	void* memory;
-	int width;
-	int height;
+	int width, height;
 	BITMAPINFO bitmapInfo;
 };
+
 globalVariable RenderState renderState;
-#include "platforme_com.cpp"
-#include "rendere.cpp"
+#include "platform_common.cpp"
+#include "renderer.cpp"
+#include "game.cpp"
 
 LRESULT CALLBACK windowClick(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	LRESULT result = 0;
@@ -44,18 +53,18 @@ LRESULT CALLBACK windowClick(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		running = false;
 	} break;
 
-	case WM_SIZE: {
+	case WM_SIZE: { // resize
 		RECT rect;
-		GetClientRect(hWnd, &rect); // функция размера прямоугольника
+		GetClientRect(hWnd, &rect);
 
-		renderState.width = rect.right - rect.left; // ширина окна
-		renderState.height = rect.bottom - rect.top; // высота окна
+		renderState.width = rect.right - rect.left; // renderState.width >> renderState.width
+		renderState.height = rect.bottom - rect.top;
 
-		int bufferSize = renderState.width * renderState.height * sizeof(unsigned int); // высчитываем размер буфера
+		int bufferSize = renderState.width * renderState.height * sizeof(unsigned int);
 
-		if (renderState.memory) // выяснем есть память 
-			VirtualFree(renderState.memory, 0, MEM_RELEASE); // освождаем память
-		renderState.memory = VirtualAlloc(0, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE); // записываем новую память
+		if (renderState.memory)
+			VirtualFree(renderState.memory, 0, MEM_RELEASE);
+		renderState.memory = VirtualAlloc(0, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
 		renderState.bitmapInfo.bmiHeader.biSize = sizeof(renderState.bitmapInfo.bmiHeader);
 		renderState.bitmapInfo.bmiHeader.biWidth = renderState.width;
@@ -73,17 +82,19 @@ LRESULT CALLBACK windowClick(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return result;
 };
 
+
+// точка входа в программу
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
-	// создать класс window
+	// создать класс window (окна)
 	WNDCLASS WindowClass = {};
-	WindowClass.style = CS_HREDRAW | CS_VREDRAW;
-	WindowClass.lpszClassName = TEXT("Game Window Class");
-	WindowClass.lpfnWndProc = windowClick;
+	WindowClass.style = CS_HREDRAW | CS_VREDRAW; // <--- задаём когда будет перерисовываться окно
+	WindowClass.lpszClassName = TEXT("Game Window Class"); // <--- название класса окна
+	WindowClass.lpfnWndProc = windowClick; // <--- мы привязываем к классу функцию обработчик кликов по окну
 
 	// зарегистрировать этот класс
-	RegisterClass(&WindowClass);
+	RegisterClass(&WindowClass); // <--- зарегистрировали класс в нашем приложении
 
-	// создать окно по шаблону
+	// создать окно
 	HWND window = CreateWindow(WindowClass.lpszClassName, TEXT("Pong - Tutorial"), WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, 0, 0, hInstance, 0);
 	HDC hdc = GetDC(window);
 
@@ -107,12 +118,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				u32 vkCode = (u32)message.wParam;
 				bool isDown = ((message.lParam & (1 << 31)) == 0);
 
-				switch (vkCode) {
-				case VK_UP: {
-					input.buttons[BUTTON_UP].isDown = true;
-					input.buttons[BUTTON_UP].changed = true;
-				} break;
+#define processButton(b, vk)\
+case vk: {\
+	input.buttons[b].isDown = true;\
+	input.buttons[b].changed = true;\
+} break;
+				switch (vkCode)
+				{
+					processButton(BUTTON_UP, VK_UP);
+					processButton(BUTTON_DOWN, VK_DOWN);
+					processButton(BUTTON_LEFT, VK_LEFT);
+					processButton(BUTTON_RIGHT, VK_RIGHT);
 				}
+
 
 			} break;
 			default: {
@@ -120,19 +138,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				DispatchMessage(&message);
 			}
 			}
+
 		}
 		// симуляция - процесс игры
-		clearScreen(0xff5500);
-		if (input.buttons[BUTTON_UP].isDown)
-			drawRectangle(0, 0, 1, 1, 0x00ff22);
-		drawRectangle(30, 30, 5, 5, 0xffff22);
-		drawRectangle(-20, 20, 8, 3, 0xffff22);
-		// симуляция - процесс игры
-		//renderBackground();
-		clearScreen(0xff5500);
-		drawRectangle(0, 0, 10, 10, 0x00ff22);
-		drawRectangle(30, 30, 5, 5, 0xffff22);
-		drawRectangle(-25, 20, 8, 3, 0x00ff22);
+		simulateGame(&input);
 
 		// перерисовка
 		StretchDIBits(hdc, 0, 0, renderState.width, renderState.height, 0, 0, renderState.width, renderState.height, renderState.memory, &renderState.bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
