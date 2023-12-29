@@ -12,7 +12,7 @@ internalVariable void simulateGame(Input* input) {
 	if (pressed(BUTTON_LEFT)) playerPositionX -= 1.f;
 	if (pressed(BUTTON_RIGHT)) playerPositionX += 1.f;
 	// 3
-	drawRectangle(playerPositionX+3, playerPositionY+3, 2, 5, 0xdc143c);
+	drawRectangle(playerPositionX+3, playerPositionY+3, 2, 5, 0x);
 	drawRectangle(playerPositionX+3, playerPositionY+6, 2, 4, 0xdc143c);
 	drawRectangle(playerPositionX+0, playerPositionY-1, 4, 2, 0xdc143c);
 	drawRectangle(playerPositionX+0, playerPositionY+4, 4, 1, 0xdc143c);
